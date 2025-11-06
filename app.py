@@ -199,26 +199,45 @@ class App(tk.Tk):
         ttk.Button(action_frame, text="Exit", command=self.on_exit).pack(side="left", padx=6)
         row += 1
 
-        self.txt = tk.Text(self, width=80, height=12, state="disabled")
-        self.txt.grid(row=row, column=0, columnspan=2, pady=(10,0), sticky="we")
+        # single-line status box (read-only)
+        self.var_status = tk.StringVar(value="Ready.")
+        self.ent_status = ttk.Entry(self, textvariable=self.var_status, state="readonly", width=80)
+        self.ent_status.grid(row=row, column=0, columnspan=2, pady=(10,0), sticky="we")
+        # Hide the status line if log_in_app_dir is false
+        if not self.cfg.get("log_in_app_dir", True):
+            self.ent_status.grid_remove()
         row += 1
+
+        # --- previously used multi-line log box ---
+        # self.txt = tk.Text(self, width=80, height=12, state="disabled")
+        # self.txt.grid(row=row, column=0, columnspan=2, pady=(10,0), sticky="we")
+        # row += 1
 
         ttk.Label(self, text=f"Primary: {self.cfg['primary_dir']}").grid(row=row, column=0, columnspan=2, sticky="w", pady=(8,0)); row+=1
         ttk.Label(self, text=f"Backup : {self.cfg['backup_dir']}").grid(row=row, column=0, columnspan=2, sticky="w"); row+=1
-        ttk.Label(self, text=f"Log   : {LOG_PATH}").grid(row=row, column=0, columnspan=2, sticky="w")
+        # ttk.Label(self, text=f"Log   : {LOG_PATH}").grid(row=row, column=0, columnspan=2, sticky="w")  # previous always-on version
+        self.lbl_log = ttk.Label(self, text=f"Log   : {LOG_PATH}")
+        if self.cfg.get("log_in_app_dir", True):
+            self.lbl_log.grid(row=row, column=0, columnspan=2, sticky="w")
 
         self.columnconfigure(1, weight=1)
 
     def log(self, msg: str):
         logging.info(msg)
-        self.txt.configure(state="normal")
-        self.txt.insert("end", msg + "\n")
-        self.txt.see("end")
-        self.txt.configure(state="disabled")
+        # update single-line status
+        if hasattr(self, "var_status"):
+            self.var_status.set(msg)
+        # --- previous log box handling ---
+        # if hasattr(self, "txt"):
+        #     self.txt.configure(state="normal")
+        #     self.txt.insert("end", msg + "\n")
+        #     self.txt.see("end")
+        #     self.txt.configure(state="disabled")
 
     def on_find_print(self, open_instead: bool = False):
         ok, normalized = validate_precinct_split(self.var_split.get())
         if not ok:
+            self.log(f"Error: {normalized}")
             messagebox.showerror("Invalid Input", normalized)
             return
 
