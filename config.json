@@ -12,9 +12,9 @@
   },
   "ballot_types": {
     "STND": "STND",
-    "PND": "PND"
+    "U18": "U18"
   },
   "open_instead_of_print": false,
   "case_insensitive": true,
-  "log_in_app_dir": true
+  "log_in_app_dir": false
 }

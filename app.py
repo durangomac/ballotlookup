@@ -119,14 +119,16 @@ def find_pdf(base_dir: str, lang_dirname: str, needle_parts: list[str], ballot_t
                 if not fn.lower().endswith(".pdf"):
                     continue
                 low = fn.lower()
-                if any(n in low for n in needle_parts_l) and ballot_l in low:
+                full_low = os.path.join(root, fn).lower()
+                if any(n in low for n in needle_parts_l) and (ballot_l in low or ballot_l in full_low):
                     hits.append(os.path.join(root, fn))
     else:
         for root, _, files in os.walk(lang_path):
             for fn in files:
                 if not fn.endswith(".pdf"):
                     continue
-                if any(n in fn for n in needle_parts) and ballot_type in fn:
+                full_path = os.path.join(root, fn)
+                if any(n in fn for n in needle_parts) and (ballot_type in fn or ballot_type in full_path):
                     hits.append(os.path.join(root, fn))
     return hits
 
@@ -165,7 +167,7 @@ class App(tk.Tk):
         self.configure(padx=16, pady=16)
 
         self.var_split = tk.StringVar()
-        self.var_ballot = tk.StringVar(value=list(self.cfg["ballot_types"].keys())[0])
+        self.var_ballot = tk.StringVar(value="STND")
         self.var_lang = tk.StringVar(value=list(self.cfg["languages"].keys())[0])
 
         # restore last precinct if available
@@ -184,6 +186,40 @@ class App(tk.Tk):
         # self.cmb_ballot.grid(row=row, column=1, sticky="we", padx=(6,0))
         # row += 1
 
+        # (previously commented)
+        # ttk.Label(self, text="Ballot Type:").grid(row=row, column=0, sticky="w")
+        # self.cmb_ballot = ttk.Combobox(self, textvariable=self.var_ballot, values=list(self.cfg["ballot_types"].keys()), state="readonly", width=16)
+        # self.cmb_ballot.grid(row=row, column=1, sticky="we", padx=(6,0))
+        # row += 1
+
+        # Active Ballot Type (ensure STND is present and listed first)
+        ttk.Label(self, text="Ballot Type:").grid(row=row, column=0, sticky="w")
+        # Build values from config (configurable), but ensure STND is present and listed first
+        # Previous logic (forced U18 second) retained below as comments for reference.
+        # cfg_bt = list(self.cfg.get("ballot_types", {}).keys())
+        # ballot_values = ["STND", "U18"] if "U18" in (self.cfg.get("ballot_types", {})) or "U18" not in cfg_bt else cfg_bt
+        # if cfg_bt and ("STND" in cfg_bt):
+        #     ordered = ["STND"] + [k for k in cfg_bt if k != "STND"]
+        #     if "U18" in cfg_bt and "U18" not in ordered:
+        #         ordered.insert(1, "U18")
+        #     if "U18" not in ordered:
+        #         ordered.insert(1, "U18")
+        #     ballot_values = ordered
+
+        cfg_bt = list(self.cfg.get("ballot_types", {}).keys())
+        # Ensure STND exists and is first
+        if "STND" in cfg_bt:
+            ballot_values = ["STND"] + [k for k in cfg_bt if k != "STND"]
+        else:
+            ballot_values = ["STND"] + cfg_bt
+        self.cmb_ballot = ttk.Combobox(self, textvariable=self.var_ballot, values=ballot_values, state="readonly", width=16)
+        try:
+            self.var_ballot.set("STND")
+        except Exception:
+            pass
+        self.cmb_ballot.grid(row=row, column=1, sticky="we", padx=(6,0))
+        row += 1
+
         ttk.Label(self, text="Language:").grid(row=row, column=0, sticky="w")
         self.cmb_lang = ttk.Combobox(self, textvariable=self.var_lang, values=list(self.cfg["languages"].keys()), state="readonly", width=16)
         self.cmb_lang.grid(row=row, column=1, sticky="we", padx=(6,0))
@@ -195,7 +231,9 @@ class App(tk.Tk):
         # ttk.Button(action_frame, text="Find & Print", command=self.on_find_print).pack(side="left")
         ttk.Button(action_frame, text="Find & Open", command=lambda: self.on_find_print(open_instead=True)).pack(side="left", padx=6)
         ttk.Button(action_frame, text="Test Paths", command=self.on_test_paths).pack(side="left", padx=6)
-        ttk.Button(action_frame, text="Open Log", command=self.on_open_log).pack(side="left", padx=6)
+        # Only show Open Log button if log_in_app_dir is true
+        if self.cfg.get("log_in_app_dir", True):
+            ttk.Button(action_frame, text="Open Log", command=self.on_open_log).pack(side="left", padx=6)
         ttk.Button(action_frame, text="Exit", command=self.on_exit).pack(side="left", padx=6)
         row += 1
 
@@ -203,9 +241,9 @@ class App(tk.Tk):
         self.var_status = tk.StringVar(value="Ready.")
         self.ent_status = ttk.Entry(self, textvariable=self.var_status, state="readonly", width=80)
         self.ent_status.grid(row=row, column=0, columnspan=2, pady=(10,0), sticky="we")
-        # Hide the status line if log_in_app_dir is false
-        if not self.cfg.get("log_in_app_dir", True):
-            self.ent_status.grid_remove()
+        # Status line always visible (no longer hidden based on log_in_app_dir)
+        # if not self.cfg.get("log_in_app_dir", True):
+        #     self.ent_status.grid_remove()
         row += 1
 
         # --- previously used multi-line log box ---
@@ -246,7 +284,11 @@ class App(tk.Tk):
         st["last_precinct"] = normalized
         write_state(st)
 
-        ballot = self.cfg["ballot_types"][self.var_ballot.get()]
+        # STND is required and defaults to itself; other ballot types (e.g., U18, PND18) are configurable in config.json.
+        # If a mapping is missing, we fall back to using the selected label directly as the type code for matching.
+        # Resolve ballot code from config; fallback to the selected label itself (e.g., "U18", "STND")
+        ballot_label = self.var_ballot.get()
+        ballot = self.cfg.get("ballot_types", {}).get(ballot_label, ballot_label)
         lang_dirname = self.cfg["languages"][self.var_lang.get()]
         needles = build_candidates(normalized)
         ci = bool(self.cfg.get("case_insensitive", True))
@@ -279,7 +321,7 @@ class App(tk.Tk):
 
         self.log(f"Found: {target}")
         open_or_print_pdf(target, open_instead=open_instead)
-        self.log("Opened." if open_instead else "Sent to printer / print command issued.")
+        self.log(F"Opened {target}." if open_instead else f"Sent to printer / print command issued for {target}.")
 
     def choose_from_list(self, paths: list[str]) -> str | None:
         dlg = tk.Toplevel(self)
