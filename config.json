@@ -1,0 +1,20 @@
+{
+  "primary_dir": "/Users/macpatterson/Documents/ballots",
+  "backup_dir": "/Users/macpatterson/Documents/ballotsback",
+  "languages": {
+    "English": "English",
+    "Spanish": "Spanish",
+    "Russian": "Russian",
+    "Vietnamese": "Vietnamese",
+    "Somali": "Somali",
+    "Chinese": "Chinese",
+    "Korean": "Korean"
+  },
+  "ballot_types": {
+    "STND": "STND",
+    "PND": "PND"
+  },
+  "open_instead_of_print": false,
+  "case_insensitive": true,
+  "log_in_app_dir": true
+}
